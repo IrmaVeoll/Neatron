@@ -1,0 +1,206 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:XorDemo.ViewModels;assembly=XorDemo"
+        xmlns:controls="clr-namespace:XorDemo.Controls"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:oxy="clr-namespace:OxyPlot.Avalonia;assembly=OxyPlot.Avalonia"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+        MinWidth="1024" MinHeight="600"
+        x:Class="XorDemo.Views.MainWindow"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="XorDemo">
+  <Design.DataContext>
+    <vm:MainWindowViewModel/>
+  </Design.DataContext>
+  <DockPanel>
+    <Grid ColumnDefinitions="Auto,7*,4*" RowDefinitions="Auto,*,*,*">
+      <Button Grid.Row="0" Grid.Column="0" Width="32" Height="32" Command="{Binding TogglePause}" Grid.ColumnSpan="3">
+        <Button.Template>
+          <ControlTemplate>
+            <Grid Background="Transparent">
+              <Path
+                  IsVisible="{Binding IsPaused}"
+                  Stretch="Fill"
+                  Fill="#1D1D1D"
+                  Data="M12,2 C6.48,2 2,6.48 2,12 C2,17.52 6.48,22 12,22 C17.52,22 22,17.52 22,12 C22,6.48 17.52,2 12,2 Z M10,16.5 L10,7.5 L16,12 L10,16.5 Z"/>
+              <Path
+                  IsVisible="{Binding !IsPaused}"
+                  Stretch="Fill"
+                  Fill="#1D1D1D"
+                  Data="M12,2 C6.48,2 2,6.48 2,12 C2,17.52 6.48,22 12,22 C17.52,22 22,17.52 22,12 C22,6.48 17.52,2 12,2 Z M11,16 L9,16 L9,8 L11,8 L11,16 Z M15,16 L13,16 L13,8 L15,8 L15,16 Z"/>
+            </Grid>
+          </ControlTemplate>
+        </Button.Template>
+      </Button>
+
+      <LayoutTransformControl Grid.Column="0" Grid.Row="1">
+        <LayoutTransformControl.LayoutTransform>
+          <RotateTransform Angle="-90"/>
+        </LayoutTransformControl.LayoutTransform>
+        <TextBlock Text="Fitness" TextAlignment="Center"/>
+      </LayoutTransformControl>
+      <oxy:Plot
+          Grid.Column="1"
+          Grid.Row="1"
+          IsLegendVisible="false"
+          ClipToBounds="false">
+        <oxy:Plot.Axes>
+          <oxy:LinearAxis
+              Position="Left"
+              Minimum="0"
+              Maximum="1"
+              x:Name="FitY"/>
+          <oxy:LinearAxis
+              Position="Bottom"
+              Minimum="1"
+              Maximum="{Binding GenerationsCount}"
+              x:Name="FitX"/>
+        </oxy:Plot.Axes>
+        <oxy:Plot.Series>
+          <oxy:AreaSeries
+              Items="{Binding FitnessGraph}"
+              Title="Fitness Area"
+              DataFieldX="Time"
+              DataFieldY="Maximum"
+              DataFieldX2="Time"
+              DataFieldY2="Minimum"
+              Fill="#E6F0E6"
+              StrokeThickness="0" />
+          <oxy:LineSeries Items="{Binding FitnessGraph}" Title="Fitness Average"
+              DataFieldX="Time"
+              DataFieldY="Value"
+              Color="#70C670"
+              StrokeThickness="2" />
+        </oxy:Plot.Series>
+      </oxy:Plot>
+
+      <LayoutTransformControl Grid.Column="0" Grid.Row="2">
+        <LayoutTransformControl.LayoutTransform>
+          <RotateTransform Angle="-90"/>
+        </LayoutTransformControl.LayoutTransform>
+        <TextBlock Text="Complexity" TextAlignment="Center"/>
+      </LayoutTransformControl>
+
+      <oxy:Plot
+        Grid.Column="1" Grid.Row="2"
+        IsLegendVisible="false"
+        ClipToBounds="false">
+        <oxy:Plot.Axes>
+          <oxy:LinearAxis
+              Position="Left"
+              Minimum="0"
+              x:Name="ComY"/>
+          <oxy:LinearAxis
+              Position="Bottom"
+              Minimum="1"
+              Maximum="{Binding GenerationsCount}"
+              x:Name="ComX"/>
+        </oxy:Plot.Axes>
+        <oxy:Plot.Series>
+          <oxy:AreaSeries
+              Items="{Binding ComplexityGraph}"
+              Title="Complexity Area"
+              DataFieldX="Time"
+              DataFieldY="Maximum"
+              DataFieldX2="Time"
+              DataFieldY2="Minimum"
+              Fill="#F5C0C0"
+              StrokeThickness="0" />
+          <oxy:LineSeries Items="{Binding ComplexityGraph}" Title="Complexity Average"
+                          DataFieldX="Time"
+                          DataFieldY="Value"
+                          Color="#FA8282"
+                          StrokeThickness="2" />
+        </oxy:Plot.Series>
+      </oxy:Plot>
+      <Grid Grid.Row="3" Grid.Column="1" ColumnDefinitions="*,Auto" RowDefinitions="*">
+        <TextBlock Grid.Column="0" Grid.Row="0" Grid.ColumnSpan="2" Text="{Binding StringFormat=Generations ({0}), Path=Generation}" TextAlignment="Center" VerticalAlignment="Top" Margin="10, 10, 10, 10"/>
+        <controls:NNetworkControl
+              Grid.Row="0"
+              Grid.Column="0"
+              Grid.RowSpan="3"
+              ClipToBounds="false"
+              Margin="10, 30, 10, 10"
+              PenOffset="{Binding AnimationValue}"
+              NetworkTopology="{Binding Leader.ParetoFrontPoint.Genome.NetworkTopology}"/>
+        <StackPanel Grid.Row="0" Grid.Column="1" Margin="10, 10, 10, 10" VerticalAlignment="Top">
+          <TextBlock Text="{Binding StringFormat=Fitness {0:0.0000000}, Path=Leader.ParetoFrontPoint.Fitness}" />
+          <TextBlock Text="{Binding StringFormat=Complexity {0}, Path=Leader.ParetoFrontPoint.Complexity}" />
+          <TextBlock Text=" "/>
+          <TextBlock Text="{Binding StringFormat=0 xor 0 = {0:0.000000}, Path=Leader.EvaluationResult[0]}" />
+          <TextBlock Text="{Binding StringFormat=0 xor 1 = {0:0.000000}, Path=Leader.EvaluationResult[1]}" />
+          <TextBlock Text="{Binding StringFormat=1 xor 0 = {0:0.000000}, Path=Leader.EvaluationResult[2]}" />
+          <TextBlock Text="{Binding StringFormat=1 xor 1 = {0:0.000000}, Path=Leader.EvaluationResult[3]}" />
+        </StackPanel>
+      </Grid>
+
+      <Grid Grid.Row="1" Grid.Column="2" ColumnDefinitions="*,Auto" RowDefinitions="Auto,*" Margin="20, 0, 20, 20">
+        <StackPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center">
+          <TextBlock Text="{Binding StringFormat=Min Error [Run {0}, Path=WinnerByFitnessFromAllRuns.Run}" FontWeight="Bold"/>
+          <TextBlock Text="{Binding StringFormat=\, Generation {0}], Path=WinnerByFitnessFromAllRuns.Generation}" FontWeight="Bold"/>
+        </StackPanel>
+        <controls:NNetworkControl
+            Grid.Column="0"
+            Grid.Row="1"
+            ClipToBounds="false"
+            Margin="10, 10, 10, 10"
+            PenOffset="{Binding AnimationValue}"
+            NetworkTopology="{Binding WinnerByFitnessFromAllRuns.ParetoFrontPoint.Genome.NetworkTopology}"/>
+        <StackPanel Grid.Row="1" Grid.Column="1" Margin="10, 10, 10, 10" VerticalAlignment="Center">
+          <TextBlock Text="{Binding StringFormat=Fitness {0:0.0000000}, Path=WinnerByFitnessFromAllRuns.ParetoFrontPoint.Fitness}" />
+          <TextBlock Text="{Binding StringFormat=Complexity {0}, Path=WinnerByFitnessFromAllRuns.ParetoFrontPoint.Complexity}" />
+          <TextBlock Text=" "/>
+          <TextBlock Text="{Binding StringFormat=0 xor 0 = {0:0.000}, Path=WinnerByFitnessFromAllRuns.EvaluationResult[0]}" />
+          <TextBlock Text="{Binding StringFormat=0 xor 1 = {0:0.000}, Path=WinnerByFitnessFromAllRuns.EvaluationResult[1]}" />
+          <TextBlock Text="{Binding StringFormat=1 xor 0 = {0:0.000}, Path=WinnerByFitnessFromAllRuns.EvaluationResult[2]}" />
+          <TextBlock Text="{Binding StringFormat=1 xor 1 = {0:0.000}, Path=WinnerByFitnessFromAllRuns.EvaluationResult[3]}" />
+        </StackPanel>
+      </Grid>
+      <Grid Grid.Row="2" Grid.Column="2" ColumnDefinitions="*,Auto" RowDefinitions="Auto,*" Margin="20, 0, 20, 20">
+        <StackPanel Orientation="Horizontal" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Center">
+          <TextBlock Text="{Binding StringFormat=Min Complexity [Run {0}, Path=WinnerBySimplicityFromAllRuns.Run}" FontWeight="Bold"/>
+          <TextBlock Text="{Binding StringFormat=\, Generation {0}], Path=WinnerBySimplicityFromAllRuns.Generation}" FontWeight="Bold"/>
+        </StackPanel>
+        <controls:NNetworkControl
+            Grid.Column="0"
+            Grid.Row="1"
+            ClipToBounds="false"
+            Margin="10, 10, 10, 10"
+            PenOffset="{Binding AnimationValue}"
+            NetworkTopology="{Binding WinnerBySimplicityFromAllRuns.ParetoFrontPoint.Genome.NetworkTopology}"/>
+        <StackPanel Grid.Row="1" Grid.Column="1" Margin="10, 0, 10, 0" VerticalAlignment="Center">
+          <TextBlock Text="{Binding StringFormat=Fitness {0:0.0000000}, Path=WinnerBySimplicityFromAllRuns.ParetoFrontPoint.Fitness}" />
+          <TextBlock Text="{Binding StringFormat=Complexity {0}, Path=WinnerBySimplicityFromAllRuns.ParetoFrontPoint.Complexity}" />
+          <TextBlock Text=" "/>
+          <TextBlock Text="{Binding StringFormat=0 xor 0 = {0:0.000}, Path=WinnerBySimplicityFromAllRuns.EvaluationResult[0]}" />
+          <TextBlock Text="{Binding StringFormat=0 xor 1 = {0:0.000}, Path=WinnerBySimplicityFromAllRuns.EvaluationResult[1]}" />
+          <TextBlock Text="{Binding StringFormat=1 xor 0 = {0:0.000}, Path=WinnerBySimplicityFromAllRuns.EvaluationResult[2]}" />
+          <TextBlock Text="{Binding StringFormat=1 xor 1 = {0:0.000}, Path=WinnerBySimplicityFromAllRuns.EvaluationResult[3]}" />
+        </StackPanel>
+      </Grid>
+      <Grid Grid.Row="3" Grid.Column="2" ColumnDefinitions="*,Auto" RowDefinitions="Auto,*" Margin="20, 0, 20, 20">
+        <StackPanel Orientation="Horizontal" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Center">
+          <TextBlock Text="{Binding StringFormat=Last Min Error [Run {0}, Path=WinnerByFitness.Run}" FontWeight="Bold"/>
+          <TextBlock Text="{Binding StringFormat=\, Generation {0}], Path=WinnerByFitness.Generation}" FontWeight="Bold"/>
+        </StackPanel>
+        <controls:NNetworkControl
+          Grid.Column="0"
+          Grid.Row="1"
+          ClipToBounds="false"
+          Margin="10, 10, 10, 10"
+          PenOffset="{Binding AnimationValue}"
+          NetworkTopology="{Binding WinnerByFitness.ParetoFrontPoint.Genome.NetworkTopology}"/>
+        <StackPanel Grid.Row="1" Grid.Column="1" Margin="10, 10, 10, 10" VerticalAlignment="Center">
+          <TextBlock Text="{Binding StringFormat=Fitness {0:0.0000000}, Path=WinnerByFitness.ParetoFrontPoint.Fitness}" />
+          <TextBlock Text="{Binding StringFormat=Complexity {0}, Path=WinnerByFitness.ParetoFrontPoint.Complexity}" />
+          <TextBlock Text=" "/>
+          <TextBlock Text="{Binding StringFormat=0 xor 0 = {0:0.000}, Path=WinnerByFitness.EvaluationResult[0]}" />
+          <TextBlock Text="{Binding StringFormat=0 xor 1 = {0:0.000}, Path=WinnerByFitness.EvaluationResult[1]}" />
+          <TextBlock Text="{Binding StringFormat=1 xor 0 = {0:0.000}, Path=WinnerByFitness.EvaluationResult[2]}" />
+          <TextBlock Text="{Binding StringFormat=1 xor 1 = {0:0.000}, Path=WinnerByFitness.EvaluationResult[3]}" />
+        </StackPanel>
+      </Grid>
+    </Grid>
+  </DockPanel>
+</Window>

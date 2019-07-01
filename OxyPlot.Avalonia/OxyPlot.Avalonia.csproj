@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netcoreapp2.2</TargetFramework>
+    <PackageId>OxyPlot.Avalonia</PackageId>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Description>OxyPlot is a plotting library for .NET. This is a support library for OxyPlot to work with AvaloniaUI.</Description>
+    <PackageLicenseUrl>https://raw.githubusercontent.com/oxyplot/oxyplot-avalonia/master/LICENSE</PackageLicenseUrl>
+    <Copyright>OxyPlot contributors</Copyright>
+    <PackageProjectUrl>http://oxyplot.org/</PackageProjectUrl>
+    <PackageIconUrl>https://raw.githubusercontent.com/oxyplot/oxyplot/develop/Icons/OxyPlot_128.png</PackageIconUrl>
+    <PackageTags>plotting plot charting chart</PackageTags>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/oxyplot/oxyplot.git</RepositoryUrl>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="**\*.xaml;Assets\*" Exclude="bin\**;obj\**;**\*.xproj;packages\**;@(EmbeddedResource)" />
+    <PackageReference Include="Avalonia" Version="0.8.0" />
+    <PackageReference Include="OxyPlot.Core" Version="2.0.0-unstable1035" />
+  </ItemGroup>
+</Project>
