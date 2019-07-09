@@ -107,7 +107,7 @@ namespace Tests.Fakes
         {
             var currentSource = Neat.Utils.RandomSource.Rng;
             
-            var field = typeof(Neat.Utils.RandomSource).GetField(nameof(Neat.Utils.RandomSource.Rng), BindingFlags.Static | BindingFlags.Public);
+            var field = typeof(Neat.Utils.RandomSource).GetField("_rng", BindingFlags.Static | BindingFlags.NonPublic);
             var source = new RandomSource(currentSource);
             field.SetValue(null, source);
             return source;
@@ -152,7 +152,7 @@ namespace Tests.Fakes
         
         public void Dispose()
         {
-            var field = typeof(Neat.Utils.RandomSource).GetField(nameof(Neat.Utils.RandomSource.Rng), BindingFlags.Static | BindingFlags.Public);
+            var field = typeof(Neat.Utils.RandomSource).GetField("_rng", BindingFlags.Static | BindingFlags.NonPublic);
             field.SetValue(null, _innerSource);
         }
 
