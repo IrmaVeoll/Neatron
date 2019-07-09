@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-
 using HiddenNeuronList = Neat.Utils.SortedList<Neat.NeuronGene, (int @in, int @out)>;
 
 namespace Neat
@@ -132,7 +131,7 @@ namespace Neat
                     var vacantConnectionCount = _inputs.Count + 
                                                 (_isRecurrent ? _outputs.Count : 0) +
                                                 sourceNeuronIdx - 
-                                                (!_isRecurrent && sourceNeuronIdx < hiddenNeuronIdx ? 0 : 1) -
+                                                (!_isRecurrent && sourceNeuronIdx >= hiddenNeuronIdx ? 1 : 0) -
                                                 connectionCount;
                     if (vacantConnectionCount > hiddenNeuronVacantConnectionIdx)
                     {
@@ -206,7 +205,7 @@ namespace Neat
             var connectionIdx = connectionCount + vacantConnectionIdx;
             var sourceIdx = connectionIdx / _outputs.Count;
             var targetIdx = connectionIdx % _outputs.Count;
-
+            
             return new ConnectionNeurons(GetSourceNeuronGene(sourceIdx), _outputs[targetIdx]);
         }
     }

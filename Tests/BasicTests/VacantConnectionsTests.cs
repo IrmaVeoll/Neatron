@@ -74,12 +74,38 @@ namespace Tests.BasicTests
             // Assert
             Assert.Equal(14, genome.VacantConnectionCount);
         }
-        
+
         [Fact]
-        public void AddConnectionsOneByOne()
+        public void AddConnectionsOneByOneRecurrent()
         {
             // Arrange
-            var parameters = new NetworkParameters(3, 1) {InitialConnectionDensity = 1f};
+            var parameters = new NetworkParameters(3, 1, NetworkType.Recurrent) {InitialConnectionDensity = 1f};
+            var tracker =
+                new InnovationTracker(NetworkParameters.BiasCount + parameters.SensorCount + parameters.EffectorCount);
+
+            var genome = new Genome(parameters, tracker, false);
+
+            // Act
+            genome.SplitConnection(0); // 0 -> 4 into 0 -> 5 -> 4
+            genome.SplitConnection(5); // 0 -> 5 -> 4 into 0 -> 6 -> 5 -> 4
+            genome.SplitConnection(2); // 2 -> 4
+
+            // Assert
+            Assert.Equal(24, genome.VacantConnectionCount);
+
+            // Act
+            for (var i = 24; i > 0; i--)
+            {
+                genome.AddConnection(RandomSource.Next(i));
+                Assert.Equal(i - 1, genome.VacantConnectionCount);
+            }
+        }
+        
+        [Fact]
+        public void AddConnectionsOneByOneFeedforward()
+        {
+            // Arrange
+            var parameters = new NetworkParameters(3, 1, NetworkType.FeedForward) {InitialConnectionDensity = 1f};
             var tracker =
                 new InnovationTracker(NetworkParameters.BiasCount + parameters.SensorCount + parameters.EffectorCount);
 
@@ -87,14 +113,14 @@ namespace Tests.BasicTests
             
             // Act
             genome.SplitConnection(0); // 0 -> 4 into 0 -> 5 -> 4
-            genome.SplitConnection(5); // 0 -> 5 -> 4 into 0 -> 6 -> 5 -> 4
-            genome.SplitConnection(2); // 2 -> 4
+            genome.SplitConnection(4); // 0 -> 5 -> 4 into 0 -> 6 -> 5 -> 4
+            genome.SplitConnection(1); // 2 -> 4
             
             // Assert
-            Assert.Equal(24, genome.VacantConnectionCount);
+            Assert.Equal(18, genome.VacantConnectionCount);
             
             // Act
-            for (var i = 24; i > 0; i--)
+            for (var i = genome.VacantConnectionCount; i > 0; i--)
             {
                 genome.AddConnection(RandomSource.Next(i));
                 Assert.Equal(i-1, genome.VacantConnectionCount);
