@@ -23,8 +23,8 @@ namespace Neat
             
             _preActivation = new float[connections.Length];
             _postActivation = new float[connections.Length];
-            _postActivation[0] = BiasValue;           
-            _gradient = _postActivation; // use same buffer for postActivation and gradient 
+            _postActivation[0] = BiasValue;
+            _gradient = new float[connections.Length]; 
 
             _encoder = encoder;
             
@@ -44,6 +44,11 @@ namespace Neat
         
         public void Activate()
         {
+            Activate(true);
+        }
+
+        private void Activate(bool resetPreActivations)
+        {
             //bias & sensors
             for (var i = 0; i < _inputCount; i++)
             {
@@ -53,7 +58,7 @@ namespace Neat
                     _preActivation[connection.TargetIdx] += _postActivation[i] * connection.Weight;
                 }
             }
-            
+
             //hidden & outputs
             for (var i = _connections.Length - 1; i >= _inputCount; i--)
             {
@@ -62,9 +67,12 @@ namespace Neat
                 _postActivation[i] = preActivationAbs > float.Epsilon
                     ? preActivation / (0.5f + preActivationAbs) //inlined zero-centered softsign
                     : 0;
-                                                                          
-                _preActivation[i] = 0;
-                
+
+                if (resetPreActivations)
+                {
+                    _preActivation[i] = 0;
+                }
+
                 for (var j = 0; j < _connections[i].Length; j++)
                 {
                     var connection = _connections[i][j];
@@ -73,32 +81,35 @@ namespace Neat
             }
         }
 
-        public void Learn(float[][] samples, float learningRate = 0.01f, float l1Ratio = 0,
-            float l2Ratio = 0)
+        public void Train(float[][] samples, float learningRate = 0.01f, float l1Ratio = 0, float l2Ratio = 0)
         {
             for (var i = 0; i < samples.Length; i++)
             {
-                for (var s = 0; s < Sensors.Count; ++s)
-                {
-                    Sensors[s] = samples[i][s];
-                }
-            
-                Activate();
-
-                PropagateError(new ArraySegment<float>(samples[i], Sensors.Count, Effectors.Count), 
-                    learningRate,
-                    l1Ratio, l2Ratio);
+                TrainIncremental(samples[i], learningRate, l1Ratio, l2Ratio);
             }
-            
+
             _encoder.Encode();
         }
 
-        public void Learn(IReadOnlyList<float> expectations, float learningRate = 0.01f, float l1Ratio = 0,
-            float l2Ratio = 0)
+        public void ActivateAndTrain(float[] samples, float learningRate = 0.01f, float l1Ratio = 0, float l2Ratio = 0)
         {
-            PropagateError(expectations, learningRate, l1Ratio, l2Ratio);
+            TrainIncremental(samples, learningRate, l1Ratio, l2Ratio);
 
             _encoder.Encode();
+        }
+
+        private void TrainIncremental(float[] samples, float learningRate, float l1Ratio, float l2Ratio)
+        {
+            for (var i = 0; i < Sensors.Count; ++i)
+            {
+                Sensors[i] = samples[i];
+            }
+
+            Activate(false);
+
+            PropagateError(new ArraySegment<float>(samples, Sensors.Count, Effectors.Count),
+                learningRate,
+                l1Ratio, l2Ratio);
         }
 
         private void PropagateError(IReadOnlyList<float> expectations, float learningRate, float l1Ratio, float l2Ratio)
@@ -121,6 +132,7 @@ namespace Neat
             {
                 _gradient[_inputCount + j] =
                     GetDerivative(_preActivation[_inputCount + j]) * (Effectors[j] - expectations[j]);
+                _preActivation[_inputCount + j] = 0;
             }
         }
         
@@ -133,26 +145,27 @@ namespace Neat
                 var connection = _connections[index][j];
                 _gradient[index] += _gradient[connection.TargetIdx] * connection.Weight;
                 _connections[index][j] =
-                    GetModifiedConnection(connection, _preActivation[index], learningRate, l1Ratio, l2Ratio);
+                    GetModifiedConnection(connection, _postActivation[index], learningRate, l1Ratio, l2Ratio);
             }
 
             _gradient[index] *= GetDerivative(_preActivation[index]);
+            _preActivation[index] = 0;
         }
         
         private void PropagateInputError(int index, float learningRate, float l1Ratio, float l2Ratio)
         {
             for (var j = 0; j < _connections[index].Length; j++)
             {
-                _connections[index][j] = GetModifiedConnection(_connections[index][j], _preActivation[index],
+                _connections[index][j] = GetModifiedConnection(_connections[index][j], _postActivation[index],
                     learningRate, l1Ratio, l2Ratio);
             }
         }
 
-        private NetworkConnection GetModifiedConnection(NetworkConnection connection, float preActivation,
+        private NetworkConnection GetModifiedConnection(NetworkConnection connection, float input,
             float learningRate, float l1Ratio, float l2Ratio)
         {
             var oldWeight = connection.Weight;
-            var newWeight = oldWeight - learningRate * (preActivation * _gradient[connection.TargetIdx] +
+            var newWeight = oldWeight - learningRate * (input * _gradient[connection.TargetIdx] +
                                                         l1Ratio * Math.Sign(oldWeight) +
                                                         l2Ratio * oldWeight);
             return new NetworkConnection(connection.TargetIdx, newWeight);

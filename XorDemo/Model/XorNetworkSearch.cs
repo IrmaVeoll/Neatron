@@ -87,7 +87,7 @@ namespace XorDemo.Model
                 .AsParallel()
                 .Select(p =>
                 {
-                    p.Genome.Network.Learn(samples, 0.01f, 0.001f);
+                    p.Genome.Network.Train(samples, 0.01f, 0.001f);
                     return p;
                 })
                 .ToList(paretoFrontPoints.Count);
