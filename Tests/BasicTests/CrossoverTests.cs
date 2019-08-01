@@ -1,4 +1,3 @@
-using System.Linq;
 using Neat;
 using Tests.Fakes;
 using Xunit;

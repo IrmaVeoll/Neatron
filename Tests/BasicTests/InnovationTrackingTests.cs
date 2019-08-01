@@ -1,4 +1,3 @@
-using Microsoft.Extensions.DependencyModel;
 using Neat;
 using Xunit;
 
