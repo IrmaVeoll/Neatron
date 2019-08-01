@@ -542,18 +542,6 @@ namespace Neat
                     return false;
                 }
 
-                var connectionsToPrevLayer = _networkConnections
-                    .Select((cs, i) => new {connections = cs, sourceIdx = i})
-                    .Where(s => s.connections.Any(c => c.TargetIdx > s.sourceIdx
-                                                       && c.TargetIdx > _neatChromosome.OuterLayersNeuronCount
-                                                       && s.sourceIdx > _neatChromosome.OuterLayersNeuronCount));
-
-                if (connectionsToPrevLayer.Any())
-                {
-                    Debug.Fail("Back connection detected in feedforward network.");
-                    return false;
-                }
-
                 // looking for hidden layers to detect in-layer bounds links 
                 for (var layerIndex = 1; layerIndex < NetworkTopology.LayerRanges.Count - 1; layerIndex++)
                 {
