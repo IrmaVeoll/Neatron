@@ -26,6 +26,7 @@ namespace XorDemo.Model
         private readonly Population _neatPopulation;
         private List<ParetoFrontPoint> _archive;
         private readonly int _archiveSize;
+        private readonly bool _isRecurrent;
 
         public XorNetworkSearch(
             PopulationParameters populationParameters,
@@ -39,15 +40,16 @@ namespace XorDemo.Model
                 .Select(_ => _neatPopulation.CreateInitialGenome()).
                 ToList(_populationParameters.PopulationSize);
 
-            _archiveSize = _populationParameters.PopulationSize / 5;
+            _archiveSize = _populationParameters.PopulationSize / 30;
             _archive = new List<ParetoFrontPoint>(_archiveSize);
+            _isRecurrent = networkParameters.IsRecurrent;
         }
         
         public SearchResult SearchNext()
         {
             var evaluatedGenomes = _genomes
                 .AsParallel()
-                .Select(g => (genome: g, fitness: Evaluate(g)))
+                .Select(g => (genome: g, fitness: Evaluate(g, _isRecurrent)))
                 .ToList(_populationParameters.PopulationSize);
             
             var paretoFrontPointCount = _populationParameters.PopulationSize + _archive.Count;
@@ -55,7 +57,7 @@ namespace XorDemo.Model
             var paretoFrontPoints = evaluatedGenomes
                 .Select(e => new ParetoFrontPoint(e.genome,
                     e.fitness,
-                    e.genome.NetworkConnectionCount))
+                    _isRecurrent ? 1 : e.genome.NetworkConnectionCount))
                 .Concat(_archive)
                 .ToList(paretoFrontPointCount);
 
@@ -81,17 +83,20 @@ namespace XorDemo.Model
                 .Take(Math.Min(paretoFrontPoints.Count, _archiveSize))
                 .ToList(Math.Max(_archive.Count, _populationParameters.PopulationSize));
 
-            var samples = SampleBestFitter(fitnessRating[0], 10);
+            if (!_isRecurrent)
+            {
+                var samples = SampleBestFitter(fitnessRating[0], 10);
 
-            _ = paretoFrontPoints
-                .AsParallel()
-                .Select(p =>
-                {
-                    p.Genome.Network.Train(samples, 0.01f, 0.001f);
-                    return p;
-                })
-                .ToList(paretoFrontPoints.Count);
-            
+                _ = paretoFrontPoints
+                    .AsParallel()
+                    .Select(p =>
+                    {
+                    p.Genome.Network.Train(samples, 0.05f, 0.001f);
+                        return p;
+                    })
+                    .ToList(paretoFrontPoints.Count);
+            }
+
             _genomes = Enumerable.Range(0, _populationParameters.PopulationSize)
                 .AsParallel()
                 .Select(_ => Reproduce( paretoFrontPoints))
@@ -227,18 +232,14 @@ namespace XorDemo.Model
             }
         }
 
-        public static IReadOnlyList<float> EvaluateWinner(ParetoFrontPoint winner)
+        public static IReadOnlyList<float> EvaluateWinner(ParetoFrontPoint winner, bool isRecurrent)
         {
             Debug.Assert(winner != null, nameof(winner) + " != null");
 
             var result = new List<float>(XorTruthTable.Length);
             foreach (var t in XorTruthTable)
             {
-                winner.Genome.Network.Sensors[0] = NormalizeInput(t[0]);
-                winner.Genome.Network.Sensors[1] = NormalizeInput(t[1]);
-                winner.Genome.Network.Activate();
-
-                result.Add(NormalizeOutput(winner.Genome.Network.Effectors[0]));
+                result.Add(ActivateAndGetEffector(winner.Genome, isRecurrent, t[0], t[1]));
             }
 
             return result;
@@ -270,7 +271,7 @@ namespace XorDemo.Model
             }
         }
 
-        private static float Evaluate(Genome genome)
+        private static float Evaluate(Genome genome, bool isRecurrent)
         {
             if (genome.IsNetworkDisconnected)
             {
@@ -281,22 +282,40 @@ namespace XorDemo.Model
             var maxFitness = (float) XorTruthTable.Length * iterationCount;
             var fitness = maxFitness;
 
-            var sensors = genome.Network.Sensors;
 
             for (var iteration = 0; iteration < iterationCount; iteration++)
                 foreach (var i in EnumerableUtils.RangeRandomOrder(0, XorTruthTable.Length, RandomSource.Rng))
                 {
-                    sensors[0] = NormalizeInput(XorTruthTable[i][0]);
-                    sensors[1] = NormalizeInput(XorTruthTable[i][1]);
-                    genome.Network.Activate();
-
-                    var diff = XorTruthTable[i][2] - NormalizeOutput(genome.Network.Effectors[0]);
+                    var diff = XorTruthTable[i][2] - ActivateAndGetEffector(genome, 
+                                   isRecurrent, 
+                                   XorTruthTable[i][0], 
+                                   XorTruthTable[i][1]);
                     fitness -= diff * diff;
                 }
 
             return fitness / maxFitness;
         }
-        
+
+        private static float ActivateAndGetEffector(Genome genome, bool isRecurrent, byte firstSensor, byte secondSensor)
+        {
+            if (isRecurrent)
+            {
+                genome.Network.Sensors[0] = NormalizeInput(firstSensor);
+                genome.Network.Activate();
+                genome.Network.Sensors[0] = NormalizeInput(secondSensor);
+                genome.Network.Activate();
+                genome.Network.Activate();
+            }
+            else
+            {
+                genome.Network.Sensors[0] = NormalizeInput(firstSensor);
+                genome.Network.Sensors[1] = NormalizeInput(secondSensor);
+                genome.Network.Activate();
+            }
+
+            return NormalizeOutput(genome.Network.Effectors[0]);
+        }
+
         private static float NormalizeInput(float i)
         {
             return i * 2 - 1;

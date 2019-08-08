@@ -15,14 +15,14 @@ namespace Neat
     {
         private class NetworkMap
         {
-            private readonly Dictionary<ConnectionNeurons, (int, int)> _connectionGeneToIdx;
-            private readonly Dictionary<int, int> _neuronIdToIdx;
+            private readonly Dictionary<ConnectionNeurons, (int neuronMapId, int neuronConnectionIndex)> _connectionGeneToNeuronMapId;
+            private readonly Dictionary<int, (int neuronMapId, int layerId)> _neuronInfo;
             private readonly List<int> _hiddenLayerBounds = new List<int>();
 
             public NetworkMap(int connectionsCapacityHint, int neuronsCapacityHint)
             {
-                _connectionGeneToIdx = new Dictionary<ConnectionNeurons, (int, int)>(connectionsCapacityHint);
-                _neuronIdToIdx = new Dictionary<int, int>(neuronsCapacityHint);
+                _connectionGeneToNeuronMapId = new Dictionary<ConnectionNeurons, (int, int)>(connectionsCapacityHint);
+                _neuronInfo = new Dictionary<int, (int neuronMapId, int layerId)>(neuronsCapacityHint);
             }
 
             public static NetworkMap CopyMaps(NetworkMap networkMap)
@@ -32,36 +32,37 @@ namespace Neat
 
             private NetworkMap(NetworkMap networkMap)
             {
-                _connectionGeneToIdx = new Dictionary<ConnectionNeurons, (int, int)>(networkMap._connectionGeneToIdx);
-                _neuronIdToIdx = new Dictionary<int, int>(networkMap._neuronIdToIdx);
+                _connectionGeneToNeuronMapId = new Dictionary<ConnectionNeurons, (int, int)>(networkMap._connectionGeneToNeuronMapId);
+                _neuronInfo = new Dictionary<int, (int, int)>(networkMap._neuronInfo);
                 IsDisconnected = networkMap.IsDisconnected;
                 _hiddenLayerBounds = networkMap._hiddenLayerBounds;
             }
 
             public bool Contains(in ConnectionGene connectionGene) =>
-                _connectionGeneToIdx.ContainsKey(connectionGene.ConnectionNeurons);
+                _connectionGeneToNeuronMapId.ContainsKey(connectionGene.ConnectionNeurons);
 
-            public int ConnectionCount => _connectionGeneToIdx.Count;
+            public int ConnectionCount => _connectionGeneToNeuronMapId.Count;
 
-            public void AddConnection(in ConnectionGene connectionGene, (int i, int j) idx)
+            public void AddConnection(in ConnectionGene connectionGene, (int neuronMapId, int neuronConnectionIndex, int layerId) neuronInfo)
             {
-                _connectionGeneToIdx.Add(connectionGene.ConnectionNeurons, idx);
-                _neuronIdToIdx[connectionGene.SourceId] = idx.i;
+                _connectionGeneToNeuronMapId.Add(connectionGene.ConnectionNeurons, (neuronInfo.neuronMapId, neuronInfo.neuronConnectionIndex));
+                _neuronInfo[connectionGene.SourceId] = (neuronInfo.neuronMapId, neuronInfo.layerId);
                 IsDisconnected = IsDisconnected && !connectionGene.Source.IsInput;
             }
 
-            public bool TryGetNetworkIdx(in ConnectionGene connectionGene, out (int i, int j) idx) =>
-                _connectionGeneToIdx.TryGetValue(connectionGene.ConnectionNeurons, out idx);
+            public bool TryGetNetworkIdx(in ConnectionGene connectionGene, out (int neuronMapId, int neuronConnectionIndex) neuronInfo) =>
+                _connectionGeneToNeuronMapId.TryGetValue(connectionGene.ConnectionNeurons, out neuronInfo);
 
-            public bool TryGetNeuronIdx(int neuronId, out int idx) => _neuronIdToIdx.TryGetValue(neuronId, out idx);
+            public bool TryGetNeuronIdx(int neuronId, out (int neuronMapId, int layerId) neuronInfo) => _neuronInfo.TryGetValue(neuronId, out neuronInfo);
 
-            public bool Contains(int neuronId) => _neuronIdToIdx.ContainsKey(neuronId);
+            public bool Contains(int neuronId) => _neuronInfo.ContainsKey(neuronId);
 
-            public void AddLayerBound(int idx) => _hiddenLayerBounds.Add(idx);
+            public void AddLayerBound(int neuronMapId) => _hiddenLayerBounds.Add(neuronMapId);
 
             public List<int> HiddenLayerBounds => _hiddenLayerBounds;
 
             public bool IsDisconnected { get; private set; } = true;
+            public Dictionary<int, (int idx, int layerId)> NeuronInfo => _neuronInfo;
         }
 
         private readonly NeatChromosome _neatChromosome;
@@ -92,7 +93,7 @@ namespace Neat
                         yield break;
                     }
 
-                    _networkMap.AddConnection(in outerLayersConnection, (sourceId, j++));
+                    _networkMap.AddConnection(in outerLayersConnection, (sourceId, j++, 0)); // TODO
 
                     idx++;
 
@@ -105,7 +106,7 @@ namespace Neat
                 _networkConnections[i] = GetOuterLayersConnections(i).ToArray();
             }
 
-            Network = new Network(_networkConnections, _neatChromosome.InputCount, _neatChromosome.OutputCount, this);
+            Network = GetNetwork();
             Debug.Assert(IsValid());
         }
 
@@ -121,11 +122,12 @@ namespace Neat
 
             _networkMap = networkBuilder._networkMap;
             _networkType = networkBuilder._networkType;
-            Network = new Network(_networkConnections, _neatChromosome.InputCount, _neatChromosome.OutputCount, this);
+
+            Network = GetNetwork();
             Debug.Assert(IsValid());
         }
 
-        internal Network Network { get; private set; }
+        internal INetwork Network { get; private set; }
 
         internal NetworkTopology NetworkTopology => new NetworkTopology(
             _neatChromosome.InputCount,
@@ -139,22 +141,14 @@ namespace Neat
 
         public void Encode()
         {
-            if (_networkType == Recurrent)
-            {
-                throw new NotImplementedException(
-                    "Looks you are trying to use backpropagation " +
-                    "on a recurrent network, but unfortunately it is not implemented yet. "
-                    + "Please be patient.");
-            }
-
             for (var i = 0; i < _neatChromosome.Count; i++)
             {
                 var connectionGene = _neatChromosome[i];
-                if (_networkMap.TryGetNetworkIdx(in connectionGene, out var idx))
+                if (_networkMap.TryGetNetworkIdx(in connectionGene, out var neuronInfo))
                 {
                     _neatChromosome[i] =
                         new ConnectionGene(connectionGene.ConnectionNeurons,
-                            _networkConnections[idx.i][idx.j].Weight,
+                            _networkConnections[neuronInfo.neuronMapId][neuronInfo.neuronConnectionIndex].Weight,
                             connectionGene.Id);
                 }
             }
@@ -208,9 +202,9 @@ namespace Neat
                 // Create a copy of the _networkMap with the same layers list
                 _networkMap = NetworkMap.CopyMaps(_networkMap);
                 // Add new connection to _networkMap
-                _networkMap.AddConnection(in connectionGene, (connectionGene.SourceId, outConnections.Length));
+                _networkMap.AddConnection(in connectionGene, (connectionGene.SourceId, outConnections.Length, 0));
                 // No layers rebuilding needed
-                Network = new Network(_networkConnections, _neatChromosome.InputCount, _neatChromosome.OutputCount, this);
+                Network = GetNetwork();
                 Debug.Assert(IsValid());
                 return;
             }
@@ -268,7 +262,7 @@ namespace Neat
             Debug.Assert(IsValid());
         }
 
-        private bool TryMapHiddenLayerConnection(IList<List<ConnectionGene>> layers, in ConnectionGene connectionGene, int currentLayerSize)
+        private bool TryMapHiddenLayerConnection(IList<List<ConnectionGene>> layers, in ConnectionGene connectionGene, int currentLayerSize, int currentLayer)
         {
             if (_networkMap.Contains(in connectionGene))
             {
@@ -279,65 +273,46 @@ namespace Neat
             {
                 var sourceId = connectionGene.SourceId;
                 layers[connectionGene.SourceId].Add(connectionGene);
-                _networkMap.AddConnection(in connectionGene, (sourceId, layers[sourceId].Count - 1));
+                _networkMap.AddConnection(in connectionGene, (sourceId, layers[sourceId].Count - 1, currentLayer));
                 return false;
             }
 
-            if (_networkMap.TryGetNeuronIdx(connectionGene.SourceId, out var i))
+            if (_networkMap.TryGetNeuronIdx(connectionGene.SourceId, out var sourceNeuronInfo))
             {
+                var sourceNeuronMapId = sourceNeuronInfo.neuronMapId;
+                var sourceLayerNumber = sourceNeuronInfo.layerId;
+
                 if (_networkType == FeedForward)
                 {
+                    int targetLayerNumber;
+                    
                     // source neuron already has a connection to some layer. it has to lie in the next layer for FeedForward network
-                    var sourceLayerNumber = -1;
-                    var targetLayerNumber = -1;
-                    if (!_networkMap.TryGetNeuronIdx(connectionGene.TargetId, out var j))
+                    if (!_networkMap.TryGetNeuronIdx(connectionGene.TargetId, out var targetNeuronInfo))
                     {
                         if (connectionGene.Target.IsOutput)
                             targetLayerNumber = 0;
                         else
                             return false; // not processed hidden neuron. so it is in current layer or previous. both variants are bad
                     }
+                    else
+                        targetLayerNumber = targetNeuronInfo.layerId;
 
-                    // detecting source and target layer indexes 
-                    var prevLayerFrom = layers.Count - currentLayerSize;
-                    for (var layerIndex = _networkMap.HiddenLayerBounds.Count - 1; layerIndex >= 0; layerIndex--)
-                    {
-                        var layerFrom = prevLayerFrom - _networkMap.HiddenLayerBounds[layerIndex];
-                        var layerTo = prevLayerFrom-1;
-
-                        if (i <= layerTo && i >= layerFrom)
-                            sourceLayerNumber = layerIndex + 1; // +1 cause effectors do not belong to the HiddenLayerBounds. so let say that lay on layer 0
-                        
-                        if (targetLayerNumber < 0 && j <= layerTo && j >= layerFrom)
-                            targetLayerNumber = layerIndex + 1;
-                        
-                        if (sourceLayerNumber >= 0 && targetLayerNumber >= 0)
-                            break;
-                        
-                        prevLayerFrom = layerFrom;
-                    }
-
-                    // if layer was not found - neuron lays on currently building layer
-                    sourceLayerNumber = sourceLayerNumber < 0 ? _networkMap.HiddenLayerBounds.Count + 1: sourceLayerNumber;
-                    targetLayerNumber = targetLayerNumber < 0 ? _networkMap.HiddenLayerBounds.Count + 1: targetLayerNumber;
-
-                    // connection within layer or connection over the next layer
-                    if (sourceLayerNumber == targetLayerNumber || targetLayerNumber - sourceLayerNumber > 1)
-                        return false; // connection within layer
+                    if (sourceLayerNumber <= targetLayerNumber || sourceLayerNumber - targetLayerNumber > 1)
+                        return false;
                 }
 
-                layers[i].Add(connectionGene);
-                _networkMap.AddConnection(in connectionGene, (i, layers[i].Count - 1));
+                layers[sourceNeuronMapId].Add(connectionGene);
+                _networkMap.AddConnection(in connectionGene, (sourceNeuronMapId, layers[sourceNeuronMapId].Count - 1, currentLayer));
                 return false;
             }
 
 
             layers.Add(new List<ConnectionGene> {connectionGene});
-            _networkMap.AddConnection(in connectionGene, (layers.Count - 1, 0));
+            _networkMap.AddConnection(in connectionGene, (layers.Count - 1, 0, currentLayer));
             return true;
         }
 
-        private void AddNextLayer(IList<List<ConnectionGene>> layers, int previousLayerNeuronCount)
+        private void AddNextLayer(IList<List<ConnectionGene>> layers, int previousLayerNeuronCount, int currentLayer)
         {
             while (true)
             {
@@ -376,7 +351,7 @@ namespace Neat
                             break;
                         }
 
-                        if (TryMapHiddenLayerConnection(layers, in hiddenLayerConnection, currentLayerNeuronCount))
+                        if (TryMapHiddenLayerConnection(layers, in hiddenLayerConnection, currentLayerNeuronCount, currentLayer))
                         {
                             currentLayerNeuronCount++;
                         }
@@ -386,6 +361,7 @@ namespace Neat
                 }
 
                 previousLayerNeuronCount = currentLayerNeuronCount;
+                currentLayer++;
             }
         }
 
@@ -410,7 +386,7 @@ namespace Neat
                         yield break;
                     }
 
-                    _networkMap.AddConnection(in outerLayersConnection, (sourceId, j++));
+                    _networkMap.AddConnection(in outerLayersConnection, (sourceId, j++, 0)); // TODO 
 
                     idx++;
 
@@ -424,7 +400,7 @@ namespace Neat
             }
 
             var hiddenLayersConnections = _neatChromosome.HiddenLayersConnections;
-
+            var currentLayer = 1;
             // adding last layer before effectors 
             for (var i = 0; i < hiddenLayersConnections.Count; i++)
             {
@@ -435,10 +411,10 @@ namespace Neat
                     break;
                 }
 
-                _ = TryMapHiddenLayerConnection(layers, in connectionGene, layers.Count);
+                _ = TryMapHiddenLayerConnection(layers, in connectionGene, layers.Count, currentLayer);
             }
 
-            AddNextLayer(layers, layers.Count - outerLayersNeuronCount);
+            AddNextLayer(layers, layers.Count - outerLayersNeuronCount, ++currentLayer);
             return layers;
         }
 
@@ -460,16 +436,16 @@ namespace Neat
                     }
                     else
                     {
-                        var res = _networkMap.TryGetNeuronIdx(connectionGene.TargetId, out var idx);
+                        var res = _networkMap.TryGetNeuronIdx(connectionGene.TargetId, out var neuronInfo);
                         Debug.Assert(res);
-                        connections[j] = new NetworkConnection(idx, connectionGene.Weight);
+                        connections[j] = new NetworkConnection(neuronInfo.neuronMapId, connectionGene.Weight); // todo
                     }
                 }
 
                 _networkConnections[i] = connections;
             }
 
-            Network = new Network(_networkConnections, _neatChromosome.InputCount, _neatChromosome.OutputCount, this);
+            Network = GetNetwork();
         }
 
         private static T[] Copy<T>(T[] source)
@@ -568,6 +544,14 @@ namespace Neat
             }
 
             return true;
+        }
+
+        private INetwork GetNetwork()
+        {
+            if(_networkType== FeedForward)
+                return new Network(_networkConnections, _neatChromosome.InputCount, _neatChromosome.OutputCount, this);
+            
+            return new RecurrentNetwork(_networkConnections, _neatChromosome.InputCount, _neatChromosome.OutputCount, this);
         }
     }
 }

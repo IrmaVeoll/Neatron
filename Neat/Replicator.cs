@@ -77,7 +77,7 @@ namespace Neat
         public Genome Reproduce(Genome betterGenome, Genome worseGenome) =>
             betterGenome.Mate(worseGenome, _crossoverType);
 
-        public void Mutate(Genome genome)
+        private void Mutate(Genome genome)
         {
             var mutationsDistribution = _mutationsDistribution;
             while (true)

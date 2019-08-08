@@ -21,7 +21,7 @@ namespace Neat
         private readonly List<NeuronGene> _outputs;
         private readonly VacantConnections _vacantConnections;
 
-        public NetworkParameters(int sensorCount, int effectorCount, NetworkType networkType = Recurrent)
+        public NetworkParameters(int sensorCount, int effectorCount, NetworkType networkType = Mixed)
         {
             if (sensorCount <= 0) throw new ArgumentOutOfRangeException(nameof(sensorCount));
             if (effectorCount <= 0) throw new ArgumentOutOfRangeException(nameof(effectorCount));
@@ -50,7 +50,7 @@ namespace Neat
 
         public NetworkType NetworkType { get; }
 
-        public bool IsRecurrent => NetworkType == Recurrent;
+        public bool IsRecurrent => NetworkType != FeedForward;
 
         public float InitialConnectionDensity
         {

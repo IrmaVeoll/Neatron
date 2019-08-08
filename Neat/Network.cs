@@ -4,7 +4,7 @@ using static Neat.NetworkParameters;
 
 namespace Neat
 {
-    public sealed class Network
+    public sealed class Network : INetwork
     {
         private const float BiasValue = 1;
         
@@ -32,15 +32,12 @@ namespace Neat
             
             Sensors = new ArraySegment<float>(_postActivation, BiasCount, sensorCount);
             Effectors = new ArraySegment<float>(_postActivation, inputCount, outputCount);
-            Activations = _postActivation;
         }
 
         // ReSharper disable once CollectionNeverQueried.Global
         public IList<float> Sensors { get; }
 
         public IReadOnlyList<float> Effectors { get; }
-        
-        internal IReadOnlyList<float> Activations { get; }
         
         public void Activate()
         {

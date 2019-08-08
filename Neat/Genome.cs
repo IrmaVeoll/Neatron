@@ -118,7 +118,7 @@ namespace Neat
             Debug.Assert(IsValid());
         }
         
-        public Network Network => _networkBuilder.Network;
+        public INetwork Network => _networkBuilder.Network;
 
         public NetworkTopology NetworkTopology => _networkBuilder.NetworkTopology;
 

@@ -2,6 +2,7 @@ using System.Linq;
 using Neat;
 using Tests.Fakes;
 using Xunit;
+using RecurrentNetwork = Tests.Fakes.RecurrentNetwork;
 
 namespace Tests.BasicTests
 {
@@ -63,7 +64,6 @@ namespace Tests.BasicTests
         [Fact]
         public void LayeredNetworkCheck()
         {
-            //TODO fix our RNN or delete this test
             var parameters = new NetworkParameters(3, 1) {InitialConnectionDensity = 1f};
             var tracker =
                 new InnovationTracker(NetworkParameters.BiasCount + parameters.SensorCount + parameters.EffectorCount);

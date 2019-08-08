@@ -16,18 +16,24 @@ namespace XorDemo.ViewModels
         private const int PeriodicalUpdateTimeoutMilliseconds = 50;
 
         private static readonly PopulationParameters PopulationParameters =
-            new PopulationParameters(200, 2);
+            new PopulationParameters(300, 2);
 
-        private static readonly NetworkParameters NetworkParameters =
+        private static readonly NetworkParameters FeedForwardNetworkParameters =
             new NetworkParameters(2, 1, NetworkType.FeedForward)
             {
-                InitialConnectionDensity = 0.9f
+                InitialConnectionDensity = 1f
+            };
+        
+        private static readonly NetworkParameters RecurrentNetworkParameters =
+            new NetworkParameters(1, 1)
+            {
+                InitialConnectionDensity = 0.7f
             };
 
         private static readonly ReproductionParameters ReproductionParameters =
             new ReproductionParameters
             {
-                CrossoverType = CrossoverType.Uniform,
+                CrossoverType = CrossoverType.ArithmeticRecombination,
 
                 WeightMutations = new WeightMutations
                 {
@@ -36,8 +42,8 @@ namespace XorDemo.ViewModels
                     {
                         new WeightTweak
                         {
-                            RouletteWheelShare = 100f,
-                            Sigma = 0.1f
+                            RouletteWheelShare = 200,
+                            Sigma = 0.5f
                         },
                         new WeightTweak
                         {
@@ -57,9 +63,9 @@ namespace XorDemo.ViewModels
                         }
                     }
                 },
-                AddConnectionRouletteWheelShare = 6f,
-                RemoveConnectionRouletteWheelShare = 8f,
-                SplitConnectionRouletteWheelShare = 4f
+                AddConnectionRouletteWheelShare = 10f,
+                RemoveConnectionRouletteWheelShare = 10f,
+                SplitConnectionRouletteWheelShare = 2f
             };
 
         private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
@@ -104,7 +110,9 @@ namespace XorDemo.ViewModels
 
         public ObservableCollection<Measurement> ComplexityGraph { get; }
 
-        public int GenerationsCount { get; } = 3000;
+        public int GenerationsCount => IsRecurrent ? 5000 : 3000;
+
+        public bool IsRecurrent { get; } = false;
 
         // TODO: selector ToggleButton[IsChecked=true] does not work, because bool? IsChecked cannot be converted to bool
         public bool IsPaused { get; private set; }
@@ -179,7 +187,7 @@ namespace XorDemo.ViewModels
             }
 
             var newWinner = searchResult.FitnessRating[0];
-            var newWinnerEvaluation = XorNetworkSearch.EvaluateWinner(newWinner);
+            var newWinnerEvaluation = XorNetworkSearch.EvaluateWinner(newWinner, IsRecurrent);
 
             if (_leaderOfRun == null || IsBetterFitness(_leaderOfRun.ParetoFrontPoint, newWinner))
             {
@@ -246,11 +254,17 @@ namespace XorDemo.ViewModels
 
             void SearchLoop()
             {
+                if (IsRecurrent)
+                {
+                    ReproductionParameters.WeightMutations.OverallRouletteWheelShare = 75f;
+                    ReproductionParameters.AddConnectionRouletteWheelShare = 16f;
+                }
+                
                 while (true)
                 {
                     var searchModel = new XorNetworkSearch(
                         PopulationParameters,
-                        NetworkParameters,
+                        IsRecurrent ? RecurrentNetworkParameters : FeedForwardNetworkParameters,
                         ReproductionParameters);
 
                     SearchResult searchResult = default;

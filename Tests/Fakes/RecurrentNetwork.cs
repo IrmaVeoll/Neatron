@@ -36,8 +36,7 @@ namespace Tests.Fakes
         }
 
         private readonly Dictionary<int, Neuron> _neurons = new Dictionary<int, Neuron>();
-        private readonly Dictionary<int, List<Connection>> _forwardConnectionMap = new Dictionary<int, List<Connection>>();
-        private readonly Dictionary<int, List<Connection>> _backwardConnectionMap = new Dictionary<int, List<Connection>>();
+        private readonly Dictionary<int, List<Connection>> _сonnectionsMap = new Dictionary<int, List<Connection>>(); // id to links targeting this neuron
         private bool _isFrozen;
         private Neuron[] _inputs;
         private Neuron[] _outputs;
@@ -60,20 +59,13 @@ namespace Tests.Fakes
             ConnectionsCount++;
             
             var connection = new Connection {SourceId = sourceId, TargetId = targetId, Weight = weight};
-            var isForward = _neurons[targetId].Layer > _neurons[sourceId].Layer;
-            if (isForward)
+            if (_сonnectionsMap.ContainsKey(targetId))
             {
-                if(_forwardConnectionMap.ContainsKey(sourceId))
-                    _forwardConnectionMap[sourceId].Add(connection);
-                else
-                    _forwardConnectionMap[sourceId] = new List<Connection>() {connection};
+                _сonnectionsMap[targetId].Add(connection);
             }
             else
             {
-                if(_backwardConnectionMap.ContainsKey(targetId))
-                    _backwardConnectionMap[targetId].Add(connection);
-                else
-                    _backwardConnectionMap[targetId] = new List<Connection>() {connection};          
+                _сonnectionsMap[targetId] = new List<Connection>() {connection};
             }
         }
         
@@ -105,9 +97,9 @@ namespace Tests.Fakes
                 _inputs[i].CurrentActivation = values[i];
             }
 
-            foreach (var neuron in _neurons.Values.OrderBy(n => n.Layer))
+            foreach (var neuron in _neurons.Values)
             {
-                if (_backwardConnectionMap.TryGetValue(neuron.Id, out var connections))
+                if (_сonnectionsMap.TryGetValue(neuron.Id, out var connections))
                 {
                     foreach (var connection in connections)
                     {
@@ -117,15 +109,7 @@ namespace Tests.Fakes
                 }
 
                 if(neuron.Layer > 0)
-                    neuron.CurrentActivation = ActivationFunction(neuron.CurrentActivation);
-                
-                if (_forwardConnectionMap.TryGetValue(neuron.Id, out connections))
-                {
-                    foreach (var connection in connections)
-                    {
-                        _neurons[connection.TargetId].CurrentActivation += connection.Weight * neuron.CurrentActivation;
-                    }
-                }            
+                    neuron.CurrentActivation = ActivationFunction(neuron.CurrentActivation);          
             }
 
             return _outputs.Select(n => n.CurrentActivation).ToArray();
